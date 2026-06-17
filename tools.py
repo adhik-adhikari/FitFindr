@@ -69,8 +69,37 @@ def search_listings(
 
     Before writing code, fill in the Tool 1 section of planning.md.
     """
-    # Replace this with your implementation
-    return []
+    listings = load_listings()
+
+    # Filter by price and size
+    filtered = []
+    for item in listings:
+        if max_price is not None and item["price"] > max_price:
+            continue
+        if size is not None and size.lower() not in item["size"].lower():
+            continue
+        filtered.append(item)
+
+    # Score by keyword overlap against title, description, style_tags, category
+    keywords = set(description.lower().split())
+
+    def score(item):
+        text_tokens = set(
+            item["title"].lower().split()
+            + item["description"].lower().split()
+            + [item["category"].lower()]
+        )
+        tag_tokens = set(
+            token
+            for tag in item["style_tags"]
+            for token in tag.lower().split()
+        )
+        return len(keywords & text_tokens) + len(keywords & tag_tokens)
+
+    scored = [(score(item), item) for item in filtered]
+    scored = [(s, item) for s, item in scored if s > 0]
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in scored]
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
@@ -100,8 +129,51 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
 
     Before writing code, fill in the Tool 2 section of planning.md.
     """
-    # Replace this with your implementation
-    return ""
+    item_desc = (
+        f"{new_item['title']} — {new_item['category']}, "
+        f"colors: {', '.join(new_item['colors'])}, "
+        f"style tags: {', '.join(new_item['style_tags'])}, "
+        f"condition: {new_item['condition']}, price: ${new_item['price']}"
+    )
+
+    wardrobe_items = wardrobe.get("items", [])
+
+    if not wardrobe_items:
+        prompt = (
+            f"I just found this thrifted item: {item_desc}.\n"
+            "The user has no wardrobe entered yet. Give 2–3 sentences of general "
+            "styling advice — what kinds of pieces pair well with it, what vibe it "
+            "suits, and one concrete styling tip. Be specific and casual."
+        )
+    else:
+        wardrobe_str = "\n".join(
+            f"- {w['name']} ({w['category']}, colors: {', '.join(w['colors'])}"
+            + (f", notes: {w['notes']}" if w.get("notes") else "") + ")"
+            for w in wardrobe_items
+        )
+        prompt = (
+            f"I just found this thrifted item: {item_desc}.\n\n"
+            f"Here is my current wardrobe:\n{wardrobe_str}\n\n"
+            "Suggest 1–2 complete outfit combinations using the new item and specific "
+            "pieces from my wardrobe. Mention which pieces to pair, explain why the "
+            "colors and styles work together, and include one concrete styling tip "
+            "(e.g., tuck, roll sleeves, layer). Keep it to 2–3 sentences, casual and specific."
+        )
+
+    try:
+        client = _get_groq_client()
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=300,
+        )
+        suggestion = response.choices[0].message.content.strip()
+        if not suggestion:
+            return "Could not generate outfit suggestions for this item."
+        return suggestion
+    except Exception as e:
+        return f"Could not generate outfit suggestions for this item. (Error: {e})"
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
@@ -133,5 +205,30 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
 
     Before writing code, fill in the Tool 3 section of planning.md.
     """
-    # Replace this with your implementation
-    return ""
+    if not outfit or not outfit.strip():
+        return "Outfit data incomplete — try suggesting the outfit first."
+
+    prompt = (
+        f"Write a punchy Instagram OOTD caption (1–2 sentences max) for this outfit.\n\n"
+        f"Thrifted item: {new_item['title']}, ${new_item['price']}, from {new_item['platform']}, "
+        f"colors: {', '.join(new_item['colors'])}.\n"
+        f"Outfit: {outfit}\n\n"
+        "Keep it short and casual — like a real post, not a product description. "
+        "Mention the item name, price, and platform naturally (once each). "
+        "Capture the outfit vibe in a few words. No hashtags."
+    )
+
+    try:
+        client = _get_groq_client()
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=1.0,
+            max_tokens=80,
+        )
+        caption = response.choices[0].message.content.strip()
+        if not caption:
+            return "We weren't able to build a fit card for this item. Try searching again."
+        return caption
+    except Exception as e:
+        return f"We weren't able to build a fit card for this item. (Error: {e})"

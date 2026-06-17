@@ -43,8 +43,31 @@ def handle_query(user_query: str, wardrobe_choice: str) -> tuple[str, str, str]:
            string and return it along with session["outfit_suggestion"] and
            session["fit_card"].
     """
-    # TODO: implement this function
-    return "Agent not yet implemented.", "", ""
+    if not user_query or not user_query.strip():
+        return "Please enter a search query.", "", ""
+
+    wardrobe = (
+        get_example_wardrobe()
+        if wardrobe_choice == "Example wardrobe"
+        else get_empty_wardrobe()
+    )
+
+    session = run_agent(user_query, wardrobe)
+
+    if session["error"]:
+        return session["error"], "", ""
+
+    item = session["selected_item"]
+    listing_text = (
+        f"{item['title']}\n"
+        f"Price: ${item['price']} | Platform: {item['platform']}\n"
+        f"Size: {item['size']} | Condition: {item['condition']}\n"
+        f"Colors: {', '.join(item['colors'])}\n"
+        f"Style: {', '.join(item['style_tags'])}\n"
+        f"Brand: {item['brand'] or 'unbranded'}"
+    )
+
+    return listing_text, session["outfit_suggestion"], session["fit_card"]
 
 
 # ── interface ─────────────────────────────────────────────────────────────────
@@ -120,4 +143,4 @@ Describe what you're looking for — include size and price if you want to filte
 
 if __name__ == "__main__":
     demo = build_interface()
-    demo.launch()
+    demo.launch(inbrowser=True)
