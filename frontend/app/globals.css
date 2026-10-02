@@ -1,0 +1,20 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f7f8f5;
+  color: #1d2922;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+main {
+  max-width: 40rem;
+  margin: 15vh auto;
+  padding: 2rem;
+}
+
+h1 {
+  margin-bottom: 0.5rem;
+}
